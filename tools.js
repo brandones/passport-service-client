@@ -1,5 +1,4 @@
 var jwt = require('jsonwebtoken')
-var httptools = require('./http')
 
 const TOKEN_NAME = 'x-token-access'
 /*
@@ -50,58 +49,9 @@ function hasToken(headers){
   return headers[TOKEN_NAME] ? true : false
 }
 
-/*
-
-  error wrapper for server side auth handlers
-  
-*/
-function handleError(res, err){
-  err = typeof(err)=='string' ? {
-    error:err
-  } : err
-  err.loggedIn = false
-  err.access = false
-  httptools.sendJSON(res, err, {
-    statusCode:500
-  })
-}
-
-/*
-
-  no authentication wrapper for server side auth handlers
-  
-*/
-function handleNoUser(res, err){
-  httptools.sendJSON(res, {
-    loggedIn:false,
-    access:false,
-    message: err || "not logged in"
-  }, {
-    statusCode:401
-  })
-}
-
-/*
-
-  no authorization wrapper for server side auth handlers
-  
-*/
-function handleNoAccess(res, err){
-  httptools.sendJSON(res, {
-    loggedIn:true,
-    access:false,
-    message: err || "not authorized"
-  }, {
-    statusCode:403
-  })
-}
-
 
 module.exports = {
   injectToken:injectToken,
   extractToken:extractToken,
   hasToken:hasToken,
-  handleError:handleError,
-  handleNoUser:handleNoUser,
-  handleNoAccess:handleNoAccess
 }

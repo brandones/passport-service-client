@@ -1,5 +1,4 @@
 var async = require('async')
-var httpTools = require('./http')
 var authTools = require('./tools')
 var authClient = require('./auth-client')
 
@@ -7,7 +6,7 @@ var authClient = require('./auth-client')
 
 ---------------------------------------------
 
-  wrap a http handler with session cookie based access control
+  create express middleware that will handle authentication
 
   this means contacting the auth server
   and writing the results to req.user
@@ -54,8 +53,6 @@ function sessionAccessControl(opts){
   var check = opts.check || defaultCheck
 
   function defaultOnFail(req, res, err) {
-    console.log('doing defaultOnFail')
-    console.log(opts.failureRedirect)
     if (opts.failureRedirect) {
       res.redirect(opts.failureRedirect)
     } else {
@@ -70,8 +67,8 @@ function sessionAccessControl(opts){
     authClient.getAuth(
       opts,
       { cookie: req.headers.cookie },
-      httpTools.errorWrapper(res, function(loginPacket) {
-        if(!loginPacket) return authTools.handleError(res, 'no login packet returned')
+      function(loginPacket) {
+        if(!loginPacket) return onFail(req, res, 'loginPacket was not sent')
         var authData = {
           context:'session',
           data: loginPacket
@@ -83,7 +80,7 @@ function sessionAccessControl(opts){
         } else {
           onFail(req, res, result)
         }
-      })
+      }
     )
   }
 }

@@ -4,11 +4,18 @@ const authClient = require('./auth-client')
 
 describe('session-access-middleware', () => {
   var sessionAccessMiddleware 
+  var res
 
   before(() => {
     const stub = sinon.stub(authClient, "getAuth")
-    stub.callsArgWith(2, undefined, { loginPacket: {} } )
+    stub.callsArgWith(2, { loginPacket: {} } )
     sessionAccessMiddleware = require('./session-access-middleware')
+  })
+
+  beforeEach(() => {
+    res = { status: sinon.stub(), send: sinon.stub(), redirect: sinon.stub() }
+    res.status.returns(res)
+    res.send.returns(res)
   })
 
   after(() => {
@@ -21,11 +28,23 @@ describe('session-access-middleware', () => {
     expect(mw.length, 'to equal', 3)
   })
 
-  it('should call next() once', function() {
-    const mw = sessionAccessMiddleware()
+  it('should call next() once if check is passed', () => {
+    const mw = sessionAccessMiddleware({ check: () => true })
     const nextSpy = sinon.spy()
-    mw({ headers: { cookie: 'something fake' } }, {}, nextSpy)
+    mw({ headers: { cookie: 'something fake' } }, res, nextSpy)
     expect(nextSpy.calledOnce, 'to be true')
+  })
+
+  it('should redirect if check is failed', () => {
+    const path = '/login'
+    const mw = sessionAccessMiddleware({
+      check: () => false,
+      failureRedirect: path
+    })
+    mw({ headers: { cookie: 'something fake' } }, res, () => {})
+    console.log(res.status.called)
+    console.log(res.send.called)
+    expect(res.redirect.calledWith(path), 'to be true')
   })
 })
 
