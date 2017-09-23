@@ -1,6 +1,5 @@
 function getConfig(opts) {
   opts = opts || {}
-  console.log(opts)
   var res = {
     host: opts.host || process.env.AUTH_SERVICE_HOST || 'localhost',
     port: opts.port || process.env.AUTH_SERVICE_PORT || 80,

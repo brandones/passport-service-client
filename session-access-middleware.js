@@ -18,17 +18,19 @@ var authClient = require('./auth-client')
   opts:
 
    * host, port, path: where to access the auth server.
-      Overrides for AUTH_SERVICE_HOST, AUTH_SERVICE_PORT, AUTH_SERVICE_PATH 
-   * authorizor(req, {
-      context:'session',
-      loggedIn:{true,false},
-      data:{
-        loginPacket...
-      }
-     }, function(err, accessData){
-  
-     })
+      Overrides for AUTH_SERVICE_HOST, AUTH_SERVICE_PORT, AUTH_SERVICE_PATH
 
+   * check: (authData) => bool || str
+      A function that should return either
+        - `true` (to allow access) or
+        - anything else (to deny access)
+      non-`true` responses will be passed to onFail
+
+   * onFail: (req, res, err) => None
+      Called when `check` returns non-`true`
+
+   * failureRedirect: String
+      Where to redirect a user on failing authentication
 
   req.user and req.accessData are populated if given
 */
@@ -42,11 +44,25 @@ function errorHandler(res, message){
 function sessionAccessControl(opts){
 
   opts = opts || {}
-  // a user supplied function that will be provided with the
-  // result of the authenticator
-  var authorizor = opts.authorizor || function(req, data, done){ done() }
-  // are we allowing any request through even if there is now user?
-  var openAccess = opts.openAccess ? true : false
+
+  function defaultCheck(authData) {
+    if(!authData.data || !authData.data.loggedIn || !authData.data.user || !authData.data.user._id){
+      return 'login required'
+    }
+    return true
+  }
+  var check = opts.check || defaultCheck
+
+  function defaultOnFail(req, res, err) {
+    console.log('doing defaultOnFail')
+    console.log(opts.failureRedirect)
+    if (opts.failureRedirect) {
+      res.redirect(opts.failureRedirect)
+    } else {
+      res.status(403).send({'result': err})
+    }
+  }
+  var onFail = opts.onFail || defaultOnFail
 
   return function(req, res, next){
     // contact the auth service to turn the cookie into a user
@@ -56,26 +72,17 @@ function sessionAccessControl(opts){
       { cookie: req.headers.cookie },
       httpTools.errorWrapper(res, function(loginPacket) {
         if(!loginPacket) return authTools.handleError(res, 'no login packet returned')
-        // authorize the user (even if we don't have on it's up to the authz fn)
-        authorizor(
-          req,
-          {
-            context:'session',
-            // we send the results from /auth/v1/status to the authorizer
-            data: loginPacket
-          },
-          function(err, access) {
-            if (err) {
-              if (access=='authz') {
-                return authTools.handleNoAccess(res, err)
-              } else {
-              // default to assuming its a no user error
-                return authTools.handleNoUser(res, err)
-              }
-            }
-            next()
-          }
-        )
+        var authData = {
+          context:'session',
+          data: loginPacket
+        }
+        var result = check(authData)
+        if (result === true) {
+          req.user = authData.data.user
+          next()
+        } else {
+          onFail(req, res, result)
+        }
       })
     )
   }
